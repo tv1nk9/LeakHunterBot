@@ -2,9 +2,11 @@ import os
 import json
 import asyncio
 import httpx
+from dotenv import load_dotenv
 
 class TelegramNotifier:
     def __init__(self):
+        load_dotenv()
         self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         self.send_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
         self.base_dir = os.path.dirname(__file__)

@@ -2,9 +2,11 @@ import os
 import json
 import asyncio
 import httpx
+from dotenv import load_dotenv
 
 class TelegramBot:
     def __init__(self):
+        load_dotenv()
         self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         self.get_updates_url = f"https://api.telegram.org/bot{self.bot_token}/getUpdates"
         self.send_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
