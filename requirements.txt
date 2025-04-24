@@ -1,0 +1,6 @@
+fastapi==0.95.2
+uvicorn==0.22.0
+httpx==0.24.0
+asyncio
+sqlite3
+python-dotenv
