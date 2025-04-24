@@ -1,0 +1,14 @@
+[
+  {
+    "email": "user@example.com",
+    "source": "forum-hacked.com",
+    "leak_info": "Пароль: 123456",
+    "notified": true
+  },
+  {
+    "email": "Geggdgd63792@mail.ru",
+    "source": "darkleaks.xyz",
+    "leak_info": "Пароль: hunter2",
+    "notified": true
+  }
+]
