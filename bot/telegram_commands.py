@@ -10,8 +10,7 @@ class TelegramBot:
         self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         self.get_updates_url = f"https://api.telegram.org/bot{self.bot_token}/getUpdates"
         self.send_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-        self.base_dir = os.path.dirname(__file__)
-        self.users_file = os.path.join(self.base_dir, "..", "db", "users.json")
+        self.db_service_url = os.getenv("DB_SERVICE_URL")  # URL микросервиса для работы с БД
         self.poll_interval = 1
         self.timeout = 20
         self.wait_to_add_email = set()
@@ -21,25 +20,26 @@ class TelegramBot:
         async with httpx.AsyncClient() as client:
             await client.post(self.send_url, data={"chat_id": chat_id, "text": text})
 
-    def load_users(self):
-        try:
-            return json.loads(open(self.users_file, encoding="utf-8").read())
-        except FileNotFoundError:
-            return {}
+    async def add_user(self, email: str, chat_id: int):
+        """Отправляет запрос на добавление пользователя в базу данных через API."""
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.db_service_url}/users",
+                json={"email": email, "chat_id": chat_id}
+            )
+            return response.status_code == 201
 
-    def save_users(self, users):
-        os.makedirs(os.path.dirname(self.users_file), exist_ok=True)
-        with open(self.users_file, "w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
+    async def delete_user(self, email: str):
+        """Отправляет запрос на удаление пользователя из базы данных через API."""
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(f"{self.db_service_url}/users/{email}")
+            return response.status_code == 200
 
-    def delete_user(self, email: str):
-        """Удаляет пользователя из JSON-файла."""
-        users = self.load_users()
-        if email in users:
-            del users[email]
-            self.save_users(users)
-            return True
-        return False
+    async def email_exists(self, email: str) -> bool:
+        """Проверяет, существует ли email в базе данных через API."""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{self.db_service_url}/users/{email}")
+            return response.status_code == 200
 
     async def handle_start(self, chat_id: int):
         self.wait_to_add_email.add(chat_id)
@@ -50,21 +50,39 @@ class TelegramBot:
         await self.send_message(chat_id, "❗️ Напиши email, который нужно добавить в подписку.")
 
     async def handle_email(self, chat_id: int, text: str):
+        """
+        Обрабатывает ввод email от пользователя.
+        Если пользователь находится в режиме подписки, добавляет email в базу данных.
+        Если пользователь находится в режиме отписки, удаляет email из базы данных.
+        """
         if chat_id in self.wait_to_add_email:
-            users = self.load_users()
-            users[text] = chat_id
-            self.save_users(users)
-            await self.send_message(chat_id, f"✅ {text} добавлен в подписку. Чтобы отписаться, напиши /unsubscribe.")
+            # Проверяем, существует ли email в базе
+            if await self.email_exists(text):
+                await self.send_message(chat_id, f"❗️ Email {text} уже существует в базе.")
+            else:
+                # Добавляем пользователя в базу данных
+                success = await self.add_user(text, chat_id)
+                if success:
+                    await self.send_message(chat_id, f"✅ {text} добавлен в подписку. Чтобы отписаться, напиши /unsubscribe.")
+                else:
+                    await self.send_message(chat_id, f"❗️ Не удалось добавить {text} в подписку. Попробуйте позже.")
             self.wait_to_add_email.discard(chat_id)
+
         elif chat_id in self.waiting_for_unsubscribe_email:
-            users = self.load_users()
-            if text in users:
-                self.delete_user(text)
-                await self.send_message(chat_id, f"✅ Email {text} успешно удален из подписки.")
+            # Проверяем, существует ли email в базе
+            if await self.email_exists(text):
+                # Удаляем пользователя из базы данных
+                success = await self.delete_user(text)
+                if success:
+                    await self.send_message(chat_id, f"✅ Email {text} успешно удален из подписки.")
+                else:
+                    await self.send_message(chat_id, f"❗️ Не удалось удалить {text} из подписки. Попробуйте позже.")
             else:
                 await self.send_message(chat_id, f"❗️ Email {text} не найден в базе.")
             self.waiting_for_unsubscribe_email.discard(chat_id)
+
         else:
+            # Если пользователь не выбрал действие
             await self.send_message(chat_id, "❗️ Сначала выбери действие. Список команд: /help")
 
     async def handle_unsubscribe(self, chat_id: int):
