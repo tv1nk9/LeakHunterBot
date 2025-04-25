@@ -41,6 +41,39 @@ class TelegramBot:
             return True
         return False
 
+    async def handle_start(self, chat_id: int):
+        self.wait_to_add_email.add(chat_id)
+        await self.send_message(chat_id, "👋 Привет! Пришли мне свой email для подписки на утечки.")
+
+    async def handle_subscribe(self, chat_id: int):
+        self.wait_to_add_email.add(chat_id)
+        await self.send_message(chat_id, "❗️ Напиши email, который нужно добавить в подписку.")
+
+    async def handle_email(self, chat_id: int, text: str):
+        if chat_id in self.wait_to_add_email:
+            users = self.load_users()
+            users[text] = chat_id
+            self.save_users(users)
+            await self.send_message(chat_id, f"✅ {text} добавлен в подписку. Чтобы отписаться, напиши /unsubscribe.")
+            self.wait_to_add_email.discard(chat_id)
+        elif chat_id in self.waiting_for_unsubscribe_email:
+            users = self.load_users()
+            if text in users:
+                self.delete_user(text)
+                await self.send_message(chat_id, f"✅ Email {text} успешно удален из подписки.")
+            else:
+                await self.send_message(chat_id, f"❗️ Email {text} не найден в базе.")
+            self.waiting_for_unsubscribe_email.discard(chat_id)
+        else:
+            await self.send_message(chat_id, "❗️ Сначала выбери действие. Список команд: /help")
+
+    async def handle_unsubscribe(self, chat_id: int):
+        self.waiting_for_unsubscribe_email.add(chat_id)
+        await self.send_message(chat_id, "❗️ Напиши email, который нужно удалить из подписки.")
+
+    async def handle_help(self, chat_id: int):
+        await self.send_message(chat_id, "Чтобы подписаться на утечки, напиши /subscribe.\nЧтобы отписаться, напиши /unsubscribe.")
+
     async def polling_commands(self):
         offset = 0
         while True:
@@ -63,42 +96,15 @@ class TelegramBot:
                 text = msg["text"].strip()
 
                 if text.startswith("/start"):
-                    self.wait_to_add_email.add(chat_id)  # Добавляем пользователя в активные
-                    await self.send_message(chat_id, "👋 Привет! Пришли мне свой email для подписки на утечки.")
-                
+                    await self.handle_start(chat_id)
                 elif text.startswith("/subscribe"):
-                    self.wait_to_add_email.add(chat_id)
-                    await self.send_message(chat_id, "❗️ Напиши email, который нужно добавить в подписку.")
-
+                    await self.handle_subscribe(chat_id)
                 elif "@" in text and "." in text:
-                    if chat_id in self.wait_to_add_email:  # Проверяем, отправил ли пользователь /start или /subscribe
-                        if text in self.waiting_for_unsubscribe_email:  # Проверяем, не ожидает ли пользователь отписку
-                            self.waiting_for_unsubscribe_email.discard(chat_id)  # Удаляем пользователя из ожидания отписки
-                        users = self.load_users()
-                        users[text] = chat_id
-                        self.save_users(users)
-                        await self.send_message(chat_id, f"✅ {text} добавлен в подписку. Чтобы отписаться, напиши /unsubscribe.")
-                        self.wait_to_add_email.discard(chat_id)  # Удаляем пользователя из активных
-                    elif chat_id in self.waiting_for_unsubscribe_email:  # Проверяем, ожидает ли пользователь ввода email для отписки
-                        users = self.load_users()
-                        if text in users:
-                            self.delete_user(text)
-                            await self.send_message(chat_id, f"✅ Email {text} успешно удален из подписки.")
-                        else:
-                            await self.send_message(chat_id, f"❗️ Email {text} не найден в базе.")
-                        self.waiting_for_unsubscribe_email.discard(chat_id)  # Удаляем пользователя из списка ожидания
-                    else:
-                        await self.send_message(chat_id, "❗️ Сначала выбери действие. Список комнад: /help")
-
+                    await self.handle_email(chat_id, text)
                 elif text.startswith("/unsubscribe"):
-                    if chat_id in self.wait_to_add_email:
-                        self.wait_to_add_email.discard(chat_id)
-                    self.waiting_for_unsubscribe_email.add(chat_id)  # Добавляем пользователя в список ожидания
-                    await self.send_message(chat_id, "❗️ Напиши email, который нужно удалить из подписки.")
-                
+                    await self.handle_unsubscribe(chat_id)
                 elif text.startswith("/help"):
-                    await self.send_message(chat_id, "Чтобы подписаться на утечки, напиши /subscribe.\nЧтобы отписаться, напиши /unsubscribe.")
-                
+                    await self.handle_help(chat_id)
                 else:
                     await self.send_message(chat_id, "❗️ Не понял. Напиши /help для получения списка команд.")
 
