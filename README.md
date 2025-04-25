@@ -42,25 +42,26 @@
 
 
 ### Пример
-  
-     ```json
-     {
-       "user@example.com": 123456789
-     }
-     ```
 
-     ```json
-     leaks_db = 
-     [ 
-      {
-        "id": 1, 
-        "email": "user@example.com", 
-        "source": "example.com", 
-        "leak_info": "Пароль скомпрометирован", 
-        "notified": False
-      }
-     ]
+#### Структура данных пользователей (`users_db`)
+```json
+{
+  "user@example.com": 123456789
+}
+```
 
+#### Структура данных утечек (`leaks_db`)
+```json
+[
+  {
+    "id": 1,
+    "email": "user@example.com",
+    "source": "example.com",
+    "leak_info": "Пароль скомпрометирован",
+    "notified": false
+  }
+]
+```
 
 3. **Запустите Telegram Bot**:
    Убедитесь, что микросервис базы данных запущен, и выполните команду:
