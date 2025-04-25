@@ -1,0 +1,8 @@
+# Исключаем файлы и папки
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.vscode/
+.idea/
