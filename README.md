@@ -41,11 +41,12 @@
      }
 
 
-# Пример
-users_db = {"user@example.com": 123456789}
-leaks_db = [
+## Пример
+  - users_db = {"user@example.com": 123456789}
+
+  - leaks_db = [
     {"id": 1, "email": "user@example.com", "source": "example.com", "leak_info": "Пароль скомпрометирован", "notified": False}
-]
+    ]
 
 
 3. **Запустите Telegram Bot**:
